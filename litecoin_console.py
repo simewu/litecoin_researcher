@@ -9,7 +9,8 @@ import readline
 datadir = '' # Virtual machine shared folder
 if os.path.exists('/media/sf_Litecoin/blocks'):
 	datadir = ' -datadir=/media/sf_Litecoin'
-
+elif os.path.exists('/media/ubuntu1/Blockchains/Litecoin/blocks'):
+	datadir = ' -datadir=/media/ubuntu1/Blockchains/Litecoin'
 
 def litecoin(cmd):
 	return os.popen(f'src/litecoin-cli{datadir} {cmd}').read()
