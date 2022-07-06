@@ -96,10 +96,10 @@ if [ "$1" == "gui" ] ; then
 	if [ "$pruned" == "true" ] ; then
 		echo "Pruned mode activated, only keeping 550 block transactions"
 		echo
-		src/qt/bitcoin-qt -prune=550 -datadir="$dir" $params #-debug=researcher
+		src/qt/litecoin-qt -prune=550 -datadir="$dir" $params #-debug=researcher
 	else
 		echo
-		src/qt/bitcoin-qt -datadir="$dir" $params #-debug=researcher
+		src/qt/litecoin-qt -datadir="$dir" $params #-debug=researcher
 	fi
 else
 
