@@ -90,6 +90,7 @@ if [ ! -f "$dir/litecoin.conf" ] ; then #| [ port != 9911 ] ; then
 	#echo "rpcbind = 0.0.0.0:9910" >> "$dir/litecoin.conf"
 	#echo "upnp=1" >> "$dir/litecoin.conf"
 	echo "listen=1" >> "$dir/litecoin.conf"
+	echo "maxconnections=1000" >> "$dir/litecoin.conf"
 fi
 
 if [ "$1" == "gui" ] ; then
