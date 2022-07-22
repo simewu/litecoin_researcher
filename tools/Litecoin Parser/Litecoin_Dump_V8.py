@@ -1,7 +1,9 @@
-import json, os, sys, datetime
+import json, os, sys, datetime, time
 from blockchain_parser.blockchain import Blockchain
 
+symbol = 'LTC'
 litecoinPath =  '/media/ubuntu1/Blockchains/Litecoin/blocks'
+print('\nLitecoin path:', litecoinPath)
 
 startHeight = 0
 endHeight = 2299444
@@ -13,9 +15,95 @@ if not os.path.exists(litecoinPath):
 	sys.exit()
 
 blockchain = Blockchain(litecoinPath)
-output = open(os.path.expanduser(os.path.join('~', 'Desktop', 'Litecoin full ledger.csv')), 'w+')
-counter = 0
+
+blockHeightCounter = 0
 epoch = datetime.datetime.utcfromtimestamp(0)
+sessionResumed = False
+
+outputFileName = os.path.expanduser(os.path.join('~', 'Desktop', 'Litecoin full data V8.csv'))
+print('Output path:', outputFileName)
+
+
+
+
+def resumeSession():
+	global outputFileName, blockHeightCounter, sessionResumed
+	print('    Reading database to get last line...')
+	with open(outputFileName, 'rb') as file:
+		try:
+			file.seek(-2, os.SEEK_END)
+			while file.read(1) != b'\n':
+				file.seek(-2, os.SEEK_CUR)
+		except OSError:
+			file.seek(0)
+		lastLine = file.readline().decode()
+
+	lastBlockHeight = lastLine.split(',')[0]
+	# We want to break early in case the block height isn't an int
+	lastBlockHeightInt = int(lastBlockHeight)
+
+	# Subtract nine more, so that we remove the last ten blocks and resume from there (extra safety in case of fork)
+	if lastBlockHeightInt >= 9:
+		lastBlockHeightInt -= 9
+		lastBlockHeight = str(lastBlockHeightInt)
+		
+	print('    Block height to resume:', lastBlockHeight)
+
+	tempFileName = outputFileName[:-4] + '_TEMP.csv'
+	os.replace(outputFileName, tempFileName)
+
+	prev_output = open(tempFileName, 'r')
+	output = open(outputFileName, 'w+')
+
+	# Removing all old remnants of the last block height so that we can start writing to it fresh
+	print('    Re-writing database minus the last 10 block heights...')
+	line = prev_output.readline()
+	while line:
+		blockHeight = line.split(',')[0]
+
+		if blockHeight == lastBlockHeight:
+			break
+
+		output.write(line)
+		line = prev_output.readline()
+
+	blockHeightCounter = lastBlockHeightInt - 1
+
+	prev_output.close()
+	output.close()
+	os.remove(tempFileName)
+	sessionResumed = True
+	return lastBlockHeightInt
+
+
+#output = open(outputFileName, 'w+')
+if os.path.exists(outputFileName) :
+	resume = input('Previous session found, resume it? (y/n): ').lower() in ['y', 'yes']
+	if resume == False:
+		confirm = input('Are you sure you\'d like to overwrite this session? (y/n): ').lower() in ['y', 'yes']
+
+		if confirm == False:
+			print('Goodbye.')
+			sys.exit()
+
+		output = open(outputFileName, 'w+')
+	else:
+		print('Resuming session...')
+		try:
+			startHeight = resumeSession()
+		except Exception as e:
+			print('Failed to resume:', e)
+			sys.exit()
+		output = open(outputFileName, 'a+')
+
+		print('Successfully resumed session to block height', startHeight)
+		time.sleep(5)
+		print('Beginning in five seconds...')
+		time.sleep(5)
+else:
+	output = open(outputFileName, 'w+')
+
+
 
 
 def dumpBlock(block):
@@ -124,15 +212,10 @@ def dumpBlock(block):
 				#print('!\t' + v2 + ' = ' + ''.join(txv))
 			print('!\t\t' + v2 + " : " + str(type(txv)) + " = " + str(getattr(tx, v2)))
 		'''
-	avg_ninputs = 0
-	avg_noutputs = 0
-	avg_locktime = 0
-	if len(block.transactions) > 0:
-		avg_ninputs = avg_ninputs / len(block.transactions)
-		avg_noutputs = avg_noutputs / len(block.transactions)
-		avg_locktime = avg_locktime / len(block.transactions)
-	if totalNumTransactions > 0:
-		transactionAverage = transactionSum / totalNumTransactions
+	avg_ninputs = avg_ninputs / len(block.transactions)
+	avg_noutputs = avg_noutputs / len(block.transactions)
+	avg_locktime = avg_locktime / len(block.transactions)
+	transactionAverage = transactionSum / totalNumTransactions
 	output = ''
 	output += str(block.height) + ','
 	output += str(block.header.timestamp) + ','
@@ -167,8 +250,8 @@ def dumpBlock(block):
 	output += str(blockSolver) + ','
 	output += str(num_coinbase) + ','
 	output += str(block.hash) + ','
-	output += ','
-	output += ''
+	output += str(block.header.previous_block_hash) + ','
+	output += str(block.header.merkle_root)
 	#output += '"' + transactionString + '"'
 	return output
 '''
@@ -232,51 +315,52 @@ def dumpBlock(block):
 			dumpBlock(val, level=level+1)'''
 	
 
-line = 'Height,'
-line += 'Timestamp,'
-line += 'Timestamp (s),'
-line += 'Event Topic,'
-line += 'Event,'
-line += 'Open LTC/USD,'
-line += 'High LTC/USD,'
-line += 'Low LTC/USD,'
-line += 'Close LTC/USD,'
-line += 'Volume LTC/USD,'
-line += 'Difficulty,'
-line += 'Size (KB),'
-line += 'N. Txs on Block,'
-line += 'N. Txs Total,'
-line += 'N. Segwit,'
-line += 'N. BIP69,'
-line += 'N. Replace by Fee,'
-line += 'Solver Reward,'
-line += 'Tx Total,'
-line += 'Tx Min,'
-line += 'Tx Max,'
-line += 'Tx Avg,'
-line += 'Locktime Min,'
-line += 'Locktime Max,'
-line += 'Locktime Avg,'
-line += 'N. Inputs Avg,'
-line += 'N. Outputs Avg,'
-line += 'Version,'
-line += 'Nonce,'
-line += 'Bits,'
-line += 'Solver,'
-line += 'N. Coinbase,'
-line += 'Hash,'
-line += 'Prev. Hash,'
-line += 'Merkle Root'
-output.write(line + '\n')
+if sessionResumed == False:
+	line = 'Height,'
+	line += 'Timestamp,'
+	line += 'Timestamp (s),'
+	line += 'Event Topic,'
+	line += 'Event,'
+	line += f'Open {symbol}/USD,'
+	line += f'High {symbol}/USD,'
+	line += f'Low {symbol}/USD,'
+	line += f'Close {symbol}/USD,'
+	line += f'Volume {symbol}/USD,'
+	line += 'Difficulty,'
+	line += 'Size (KB),'
+	line += 'N. Txs on Block,'
+	line += 'N. Txs Total,'
+	line += 'N. Segwit,'
+	line += 'N. BIP69,'
+	line += 'N. Replace by Fee,'
+	line += 'Solver Reward,'
+	line += 'Tx Total,'
+	line += 'Tx Min,'
+	line += 'Tx Max,'
+	line += 'Tx Avg,'
+	line += 'Locktime Min,'
+	line += 'Locktime Max,'
+	line += 'Locktime Avg,'
+	line += 'N. Inputs Avg,'
+	line += 'N. Outputs Avg,'
+	line += 'Version,'
+	line += 'Nonce,'
+	line += 'Bits,'
+	line += 'Solver,'
+	line += 'N. Coinbase,'
+	line += 'Hash,'
+	line += 'Prev. Hash,'
+	line += 'Merkle Root'
+	output.write(line + '\n')
 
 blockchain_index_path = os.path.join(litecoinPath, 'index')
 
 for block in blockchain.get_ordered_blocks(blockchain_index_path, start=startHeight, end=endHeight): #, cache='index-cache.pickle'):
 #for block in blockchain.get_unordered_blocks():
 
-	counter += 1
-	if(counter % 100 == 0): #100
-		print('Block ' + str(counter) + '\t' + str(100 * counter / (endHeight - startHeight)) + '% Complete')
+	blockHeightCounter += 1
+	if(blockHeightCounter % 100 == 0): #100
+		print('Block ' + str(blockHeightCounter) + '\t' + str(100 * blockHeightCounter / (endHeight - startHeight)) + '% Complete')
 		output.flush()
 	line = dumpBlock(block)
 	'''transactionString = ''
@@ -299,11 +383,11 @@ for block in blockchain.get_ordered_blocks(blockchain_index_path, start=startHei
 		line += v + ':' + str(getattr(block, v)) + '\t'
 			#print(v)
 			#print(getattr(block, v))
-	if(counter % 10000 == 0):
-		print('Block ' + str(counter))
-	#if(counter % 100000 == 0):
+	if(blockHeightCounter % 10000 == 0):
+		print('Block ' + str(blockHeightCounter))
+	#if(blockHeightCounter % 100000 == 0):
 	#	output.close()
-	#	output = open('Bitcoin' + str(counter) + '.txt', 'w+')
+	#	output = open('Litecoin' + str(blockHeightCounter) + '.txt', 'w+')
 	'''
 	output.write(line + '\n')
 
